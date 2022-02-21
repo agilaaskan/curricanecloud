@@ -1,0 +1,138 @@
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+// @codingStandardsIgnoreFile
+
+/** @var $block \Magento\Checkout\Block\Cart\Sidebar */
+?>
+<?php
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+$storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
+$baseUrl = $storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
+$customerSession = $objectManager->create('Magento\Customer\Model\Session'); ?>
+<div class="rd-navbar-collapse-container">
+
+<div class="rd-navbar-collapse">
+
+<ul class="header links">
+
+<li><a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/customer/account/" class="my-account"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Mi Cuenta</font></font></a>
+</li>
+
+<li class="link wishlist" data-bind="scope: 'wishlist'">
+    <a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/wishlist/"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Mi lista de deseos</font></font>
+        <!-- ko if: wishlist().counter -->
+        <span data-bind="text: wishlist().items.length" class="counter qty wishcount"></span>
+            <!-- /ko -->
+         <!-- ko ifnot: wishlist().counter -->
+         <span class="counter qty wishcount">0</span>
+        <!-- /ko -->
+    </a>
+</li>
+
+<!-- <li class="authorization-link" data-label="o">
+    <a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/customer/account/login/referer/aHR0cHM6Ly93d3cuY3VycmljYW5lcy5jb20v/"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">
+        Log in</font></font></a>
+</li> -->
+
+<?php
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+$customerSession = $objectManager->create('Magento\Customer\Model\Session');
+if($customerSession->isLoggedIn()) : ?>
+<li class="invite-friend" data-label="o">
+    <a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/invitation/index/send/"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">
+    Invitar un amigo</font></font></a>
+</li>
+<li class="authorization-link" data-label="o">
+    <a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/customer/account/logout/"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Cerrar sesión</font></font></a>
+</li>
+
+<?php else: ?>
+
+    <li class="authorization-link" data-label="o">
+    <a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/customer/account/login/referer/aHR0cHM6Ly93d3cuY3VycmljYW5lcy5jb20v/"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">
+    Iniciar sesión</font></font></a>
+</li>
+<li><a href="https://sandboxm2-yml5nea-jnn4ff2eo42oa.us-3.magentosite.cloud/customer/account/create/" class="create-an-account"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Crear una cuenta</font></font></a></li>
+<?php endif;?>
+
+
+
+</ul>
+</div>
+</div>
+
+<div data-block="minicart" class="minicart-wrapper">
+    <a class="action showcart" href="<?= /* @escapeNotVerified */ $block->getShoppingCartUrl() ?>"
+       data-bind="scope: 'minicart_content'">
+        <span class="text"><?= /* @escapeNotVerified */ __('My Cart') ?></span>
+        <span class="counter qty empty"
+              data-bind="css: { empty: !!getCartParam('summary_count') == false }, blockLoader: isLoading">
+            <span class="counter-number"><!-- ko text: getCartParam('summary_count') --><!-- /ko --></span>
+            <span class="counter-label">
+            <!-- ko if: getCartParam('summary_count') -->
+                <!-- ko text: getCartParam('summary_count') --><!-- /ko -->
+                <!-- ko i18n: 'items' --><!-- /ko -->
+            <!-- /ko -->
+            </span>
+        </span>
+    </a>
+    <?php if ($block->getIsNeedToDisplaySideBar()): ?>
+        <div class="block block-minicart"
+             data-role="dropdownDialog"
+             data-mage-init='{"dropdownDialog":{
+                "appendTo":"[data-block=minicart]",
+                "triggerTarget":".showcart",
+                "timeout": "2000",
+                "closeOnMouseLeave": false,
+                "closeOnEscape": true,
+                "triggerClass":"active",
+                "parentClass":"active",
+                "buttons":[]}}'>
+            <div id="minicart-content-wrapper" data-bind="scope: 'minicart_content'">
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            </div>
+            <?= $block->getChildHtml('minicart.addons') ?>
+        </div>
+    <?php else: ?>
+        <script>
+            require(['jquery'], function ($) {
+                $('a.action.showcart').click(function() {
+                    $(document.body).trigger('processStart');
+                });
+            });
+        </script>
+    <?php endif ?>
+    <script>
+        window.checkout = <?= /* @escapeNotVerified */ $block->getSerializedConfig() ?>;
+    </script>
+    <script type="text/x-magento-init">
+    {
+        "*": {
+            "Magento_Ui/js/core/app": {
+                "components": {
+                    "wishlist": {
+                        "component": "Magento_Wishlist/js/view/wishlist"
+                    }
+                }
+            }
+        }
+    }
+
+</script>
+    <script type="text/x-magento-init">
+    {
+        "[data-block='minicart']": {
+            "Magento_Ui/js/core/app": <?= /* @escapeNotVerified */ $block->getJsLayout() ?>
+        },
+        "*": {
+            "Magento_Ui/js/block-loader": "<?= /* @escapeNotVerified */ $block->getViewFileUrl('images/loader-1.gif') ?>"
+        }
+    }
+    </script>
+</div>
+
+

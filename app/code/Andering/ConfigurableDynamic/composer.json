@@ -1,0 +1,22 @@
+{
+    "name": "andering/magento2-configurable-dynamic",
+    "description": "",
+    "require": {
+		
+    },
+    "type": "magento2-module",
+    "version": "0.1.0",
+    "extra": {
+        "map": [
+            [	"*",
+                "Andering/ConfigurableDynamic"
+            ]
+        ]
+    },	
+    "authors": [
+        {
+            "name": "Andrej Kouril",
+            "role": "Developer"
+        }
+    ]
+}

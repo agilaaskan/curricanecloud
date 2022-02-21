@@ -1,0 +1,53 @@
+<!-- schema tag -->
+<?php
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+$storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
+$baseUrl = $storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
+$objDate = $objectManager->create('Magento\Framework\Stdlib\DateTime\DateTime');
+$TaxHelper = $objectManager->get('Magento\Catalog\Helper\Data');
+$date = $objDate->gmtDate();
+$date1=date('d-m-Y', strtotime('+1 year', strtotime($date)) );
+$customerSession = $objectManager->create('Magento\Customer\Model\Session'); ?>
+<?php
+$product = $block->getProduct();
+$tprice = $TaxHelper->getTaxPrice($product, $product->getFinalPrice(), true);
+?>
+<?php $_finalPrice = $product->getFinalPrice();  ?>
+<?php $cstoreid = $storeManager->getStore()->getStoreId(); ?>
+<?php $product2 = $objectManager->create('Magento\Catalog\Model\Product')->load($product->getId());?>
+<?php $prourl = $product2->setStoreId($cstoreid)->getUrlModel()->getUrlInStore($product2, ['_escape' => true]); ?>
+<?php if ($product->getIsSalable()) { 
+    $sstock = "https://schema.org/InStock";
+}
+else
+{
+    $sstock = "https://schema.org/OutofStock";
+} 
+$csku = $product->getSku(); 
+$_finalPrice1 = round($_finalPrice);
+$tprice1 = round($tprice);
+
+?> 
+<div class="product-price h5 "
+        itemprop="offers"
+        itemscope
+        itemtype="https://schema.org/Offer"
+>
+        <link itemprop="url" href="<?php echo $prourl; ?>" />
+        <link itemprop="availability" href="<?php echo $sstock ; ?>"/>
+        <meta itemprop="priceCurrency" content="USD">
+        <meta itemprop="priceValidUntil" content="<?php echo $date1; ?>" />
+    <div class="current-price">
+    <?php if( $product->getTypeId() == 'configurable' ){ ?>
+          <meta itemprop="price" content="<?php echo $_finalPrice1; ?>" />
+    <?php } else { ?>
+        <meta itemprop="price" content="<?php echo $tprice1; ?>" />
+    <?php  }?>
+   </div>
+</div>
+<meta itemprop="sku" content="<?php echo $csku; ?>" />
+<meta itemprop="mpn" content="no" />
+<div itemprop="brand" itemtype="http://schema.org/Brand" itemscope>
+     <meta itemprop="name" content="Curricanes" />
+</div>
+<!-- schema tag end-->

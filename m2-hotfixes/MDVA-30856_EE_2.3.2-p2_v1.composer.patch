@@ -1,0 +1,808 @@
+diff --git a/vendor/magento/module-catalog/Model/Product/Type/Price.php b/vendor/magento/module-catalog/Model/Product/Type/Price.php
+index 6b4b229e2c1..37c91308708 100644
+--- a/vendor/magento/module-catalog/Model/Product/Type/Price.php
++++ b/vendor/magento/module-catalog/Model/Product/Type/Price.php
+@@ -6,6 +6,7 @@
+ namespace Magento\Catalog\Model\Product\Type;
+ 
+ use Magento\Catalog\Model\Product;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\Customer\Api\GroupManagementInterface;
+ use Magento\Framework\Pricing\PriceCurrencyInterface;
+ use Magento\Store\Model\Store;
+@@ -92,6 +93,11 @@ class Price
+     private $tierPriceExtensionFactory;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * Constructor
+      *
+      * @param \Magento\CatalogRule\Model\ResourceModel\RuleFactory $ruleFactory
+@@ -104,6 +110,7 @@ class Price
+      * @param \Magento\Catalog\Api\Data\ProductTierPriceInterfaceFactory $tierPriceFactory
+      * @param \Magento\Framework\App\Config\ScopeConfigInterface $config
+      * @param ProductTierPriceExtensionFactory|null $tierPriceExtensionFactory
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+      */
+     public function __construct(
+@@ -116,7 +123,8 @@ class Price
+         GroupManagementInterface $groupManagement,
+         \Magento\Catalog\Api\Data\ProductTierPriceInterfaceFactory $tierPriceFactory,
+         \Magento\Framework\App\Config\ScopeConfigInterface $config,
+-        ProductTierPriceExtensionFactory $tierPriceExtensionFactory = null
++        ProductTierPriceExtensionFactory $tierPriceExtensionFactory = null,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->_ruleFactory = $ruleFactory;
+         $this->_storeManager = $storeManager;
+@@ -129,6 +137,8 @@ class Price
+         $this->config = $config;
+         $this->tierPriceExtensionFactory = $tierPriceExtensionFactory ?: ObjectManager::getInstance()
+             ->get(ProductTierPriceExtensionFactory::class);
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -613,7 +623,7 @@ class Price
+         );
+ 
+         if ($rulePrice === false) {
+-            $date = $this->_localeDate->scopeDate($sId);
++            $date = $this->ruleDateFormatter->getDate($sId);
+             $rulePrice = $this->_ruleFactory->create()->getRulePrice($date, $wId, $gId, $productId);
+         }
+ 
+diff --git a/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/CollectionProcessor.php b/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/CollectionProcessor.php
+index 0ea31f5dbaf..d1577727f87 100644
+--- a/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/CollectionProcessor.php
++++ b/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/CollectionProcessor.php
+@@ -7,7 +7,9 @@
+ namespace Magento\CatalogRule\Model\ResourceModel\Product;
+ 
+ use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\CatalogRule\Pricing\Price\CatalogRulePrice;
++use Magento\Framework\App\ObjectManager;
+ 
+ /**
+  * Add catalog rule prices to collection
+@@ -40,24 +42,33 @@ class CollectionProcessor
+     private $localeDate;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+      * @param \Magento\Framework\App\ResourceConnection $resourceConnection
+      * @param \Magento\Customer\Model\Session $customerSession
+      * @param \Magento\Framework\Stdlib\DateTime $dateTime
+      * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      */
+     public function __construct(
+         \Magento\Store\Model\StoreManagerInterface $storeManager,
+         \Magento\Framework\App\ResourceConnection $resourceConnection,
+         \Magento\Customer\Model\Session $customerSession,
+         \Magento\Framework\Stdlib\DateTime $dateTime,
+-        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
++        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->storeManager = $storeManager;
+         $this->resource = $resourceConnection;
+         $this->customerSession = $customerSession;
+         $this->dateTime = $dateTime;
+         $this->localeDate = $localeDate;
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -82,7 +93,7 @@ class CollectionProcessor
+                         ),
+                         $connection->quoteInto(
+                             'catalog_rule.rule_date = ?',
+-                            $this->dateTime->formatDate($this->localeDate->scopeDate($store->getId()), false)
++                            $this->dateTime->formatDate($this->ruleDateFormatter->getDate($store->getId()), false)
+                         ),
+                     ]),
+                     [CatalogRulePrice::PRICE_CODE => 'rule_price']
+diff --git a/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/LinkedProductSelectBuilderByCatalogRulePrice.php b/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/LinkedProductSelectBuilderByCatalogRulePrice.php
+index 3f396cacd37..d3731f7c9ed 100644
+--- a/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/LinkedProductSelectBuilderByCatalogRulePrice.php
++++ b/vendor/magento/module-catalog-rule/Model/ResourceModel/Product/LinkedProductSelectBuilderByCatalogRulePrice.php
+@@ -7,6 +7,7 @@ namespace Magento\CatalogRule\Model\ResourceModel\Product;
+ 
+ use Magento\Catalog\Api\Data\ProductInterface;
+ use Magento\Catalog\Model\ResourceModel\Product\BaseSelectProcessorInterface;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\Framework\App\ObjectManager;
+ use Magento\Framework\DB\Select;
+ use Magento\Catalog\Model\ResourceModel\Product\LinkedProductSelectBuilderInterface;
+@@ -49,6 +50,11 @@ class LinkedProductSelectBuilderByCatalogRulePrice implements LinkedProductSelec
+     private $baseSelectProcessor;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+      * @param \Magento\Framework\App\ResourceConnection $resourceConnection
+      * @param \Magento\Customer\Model\Session $customerSession
+@@ -56,6 +62,7 @@ class LinkedProductSelectBuilderByCatalogRulePrice implements LinkedProductSelec
+      * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+      * @param \Magento\Framework\EntityManager\MetadataPool $metadataPool
+      * @param BaseSelectProcessorInterface $baseSelectProcessor
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      */
+     public function __construct(
+         \Magento\Store\Model\StoreManagerInterface $storeManager,
+@@ -64,7 +71,8 @@ class LinkedProductSelectBuilderByCatalogRulePrice implements LinkedProductSelec
+         \Magento\Framework\Stdlib\DateTime $dateTime,
+         \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+         \Magento\Framework\EntityManager\MetadataPool $metadataPool,
+-        BaseSelectProcessorInterface $baseSelectProcessor = null
++        BaseSelectProcessorInterface $baseSelectProcessor = null,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->storeManager = $storeManager;
+         $this->resource = $resourceConnection;
+@@ -74,6 +82,8 @@ class LinkedProductSelectBuilderByCatalogRulePrice implements LinkedProductSelec
+         $this->metadataPool = $metadataPool;
+         $this->baseSelectProcessor = (null !== $baseSelectProcessor)
+             ? $baseSelectProcessor : ObjectManager::getInstance()->get(BaseSelectProcessorInterface::class);
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -81,7 +91,7 @@ class LinkedProductSelectBuilderByCatalogRulePrice implements LinkedProductSelec
+      */
+     public function build($productId)
+     {
+-        $timestamp = $this->localeDate->scopeTimeStamp($this->storeManager->getStore());
++        $timestamp = $this->ruleDateFormatter->getTimeStamp($this->storeManager->getStore());
+         $currentDate = $this->dateTime->formatDate($timestamp, false);
+         $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+         $productTable = $this->resource->getTableName('catalog_product_entity');
+diff --git a/vendor/magento/module-catalog-rule/Model/RuleDateFormatter.php b/vendor/magento/module-catalog-rule/Model/RuleDateFormatter.php
+new file mode 100644
+index 00000000000..88309695881
+--- /dev/null
++++ b/vendor/magento/module-catalog-rule/Model/RuleDateFormatter.php
+@@ -0,0 +1,43 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++declare(strict_types=1);
++
++namespace Magento\CatalogRule\Model;
++
++/**
++ * Local date for catalog rule
++ */
++class RuleDateFormatter implements \Magento\CatalogRule\Model\RuleDateFormatterInterface
++{
++    /**
++     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
++     */
++    private $localeDate;
++
++    /**
++     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
++     */
++    public function __construct(\Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate)
++    {
++        $this->localeDate = $localeDate;
++    }
++
++    /**
++     * @inheritdoc
++     */
++    public function getDate($scope = null): \DateTime
++    {
++        return $this->localeDate->scopeDate($scope, null, true);
++    }
++
++    /**
++     * @inheritdoc
++     */
++    public function getTimeStamp($scope = null): int
++    {
++        return $this->localeDate->scopeTimeStamp($scope);
++    }
++}
+\ No newline at end of file
+diff --git a/vendor/magento/module-catalog-rule/Model/RuleDateFormatterInterface.php b/vendor/magento/module-catalog-rule/Model/RuleDateFormatterInterface.php
+new file mode 100644
+index 00000000000..c76223eeca2
+--- /dev/null
++++ b/vendor/magento/module-catalog-rule/Model/RuleDateFormatterInterface.php
+@@ -0,0 +1,30 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++declare(strict_types=1);
++
++namespace Magento\CatalogRule\Model;
++
++/**
++ * Local date for catalog rule
++ */
++interface RuleDateFormatterInterface
++{
++    /**
++     * Create \DateTime object with date converted to scope timezone for catalog rule
++     *
++     * @param mixed $scope Information about scope
++     * @return \DateTime
++     */
++    public function getDate($scope = null): \DateTime;
++
++    /**
++     * Get scope timestamp for catalog rule
++     *
++     * @param mixed $scope Information about scope
++     * @return int
++     */
++    public function getTimeStamp($scope = null): int;
++}
+\ No newline at end of file
+diff --git a/vendor/magento/module-catalog-rule/Observer/PrepareCatalogProductCollectionPricesObserver.php b/vendor/magento/module-catalog-rule/Observer/PrepareCatalogProductCollectionPricesObserver.php
+index 75a208e8710..d13536a2533 100644
+--- a/vendor/magento/module-catalog-rule/Observer/PrepareCatalogProductCollectionPricesObserver.php
++++ b/vendor/magento/module-catalog-rule/Observer/PrepareCatalogProductCollectionPricesObserver.php
+@@ -11,12 +11,14 @@ namespace Magento\CatalogRule\Observer;
+ 
+ use Magento\Catalog\Model\Product;
+ use Magento\CatalogRule\Model\Rule;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\Store\Model\StoreManagerInterface;
+ use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
+ use Magento\Customer\Model\Session as CustomerModelSession;
+ use Magento\Framework\Event\Observer as EventObserver;
+ use Magento\Customer\Api\GroupManagementInterface;
+ use Magento\Framework\Event\ObserverInterface;
++use Magento\Framework\App\ObjectManager;
+ 
+ /**
+  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+@@ -54,12 +56,18 @@ class PrepareCatalogProductCollectionPricesObserver implements ObserverInterface
+     protected $groupManagement;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param RulePricesStorage $rulePricesStorage
+      * @param \Magento\CatalogRule\Model\ResourceModel\RuleFactory $resourceRuleFactory
+      * @param StoreManagerInterface $storeManager
+      * @param TimezoneInterface $localeDate
+      * @param CustomerModelSession $customerSession
+      * @param GroupManagementInterface $groupManagement
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      */
+     public function __construct(
+         RulePricesStorage $rulePricesStorage,
+@@ -67,7 +75,8 @@ class PrepareCatalogProductCollectionPricesObserver implements ObserverInterface
+         StoreManagerInterface $storeManager,
+         TimezoneInterface $localeDate,
+         CustomerModelSession $customerSession,
+-        GroupManagementInterface $groupManagement
++        GroupManagementInterface $groupManagement,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->rulePricesStorage = $rulePricesStorage;
+         $this->resourceRuleFactory = $resourceRuleFactory;
+@@ -75,6 +84,8 @@ class PrepareCatalogProductCollectionPricesObserver implements ObserverInterface
+         $this->localeDate = $localeDate;
+         $this->customerSession = $customerSession;
+         $this->groupManagement = $groupManagement;
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -101,7 +112,7 @@ class PrepareCatalogProductCollectionPricesObserver implements ObserverInterface
+         if ($observer->getEvent()->hasDate()) {
+             $date = new \DateTime($observer->getEvent()->getDate());
+         } else {
+-            $date = (new \DateTime())->setTimestamp($this->localeDate->scopeTimeStamp($store));
++            $date = (new \DateTime())->setTimestamp($this->ruleDateFormatter->getTimeStamp($store));
+         }
+ 
+         $productIds = [];
+diff --git a/vendor/magento/module-catalog-rule/Observer/ProcessAdminFinalPriceObserver.php b/vendor/magento/module-catalog-rule/Observer/ProcessAdminFinalPriceObserver.php
+index 2dce2cb2f5b..cb4989177a4 100644
+--- a/vendor/magento/module-catalog-rule/Observer/ProcessAdminFinalPriceObserver.php
++++ b/vendor/magento/module-catalog-rule/Observer/ProcessAdminFinalPriceObserver.php
+@@ -11,11 +11,13 @@ namespace Magento\CatalogRule\Observer;
+ 
+ use Magento\Catalog\Model\Product;
+ use Magento\CatalogRule\Model\Rule;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
+ use Magento\Customer\Model\Session as CustomerModelSession;
+ use Magento\Framework\Event\Observer as EventObserver;
+ use Magento\Framework\Registry;
+ use Magento\Framework\Event\ObserverInterface;
++use Magento\Framework\App\ObjectManager;
+ 
+ class ProcessAdminFinalPriceObserver implements ObserverInterface
+ {
+@@ -42,21 +44,30 @@ class ProcessAdminFinalPriceObserver implements ObserverInterface
+     protected $rulePricesStorage;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param RulePricesStorage $rulePricesStorage
+      * @param Registry $coreRegistry
+      * @param \Magento\CatalogRule\Model\ResourceModel\RuleFactory $resourceRuleFactory
+      * @param TimezoneInterface $localeDate
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      */
+     public function __construct(
+         RulePricesStorage $rulePricesStorage,
+         Registry $coreRegistry,
+         \Magento\CatalogRule\Model\ResourceModel\RuleFactory $resourceRuleFactory,
+-        TimezoneInterface $localeDate
++        TimezoneInterface $localeDate,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->rulePricesStorage = $rulePricesStorage;
+         $this->coreRegistry = $coreRegistry;
+         $this->resourceRuleFactory = $resourceRuleFactory;
+         $this->localeDate = $localeDate;
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -69,7 +80,7 @@ class ProcessAdminFinalPriceObserver implements ObserverInterface
+     {
+         $product = $observer->getEvent()->getProduct();
+         $storeId = $product->getStoreId();
+-        $date = $this->localeDate->scopeDate($storeId);
++        $date = $this->ruleDateFormatter->getDate($storeId);
+         $key = false;
+ 
+         $ruleData = $this->coreRegistry->registry('rule_data');
+diff --git a/vendor/magento/module-catalog-rule/Observer/ProcessFrontFinalPriceObserver.php b/vendor/magento/module-catalog-rule/Observer/ProcessFrontFinalPriceObserver.php
+index 2d4042f6915..8d6a6875d76 100644
+--- a/vendor/magento/module-catalog-rule/Observer/ProcessFrontFinalPriceObserver.php
++++ b/vendor/magento/module-catalog-rule/Observer/ProcessFrontFinalPriceObserver.php
+@@ -9,12 +9,14 @@
+  */
+ namespace Magento\CatalogRule\Observer;
+ 
++use Magento\CatalogRule\Model\RuleDateFormatterInterface;
+ use Magento\Framework\Event\ObserverInterface;
+ use Magento\Catalog\Model\Product;
+ use Magento\CatalogRule\Model\Rule;
+ use Magento\Store\Model\StoreManagerInterface;
+ use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
+ use Magento\Customer\Model\Session as CustomerModelSession;
++use Magento\Framework\App\ObjectManager;
+ use Magento\Framework\Event\Observer as EventObserver;
+ 
+ class ProcessFrontFinalPriceObserver implements ObserverInterface
+@@ -45,24 +47,33 @@ class ProcessFrontFinalPriceObserver implements ObserverInterface
+     protected $rulePricesStorage;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param RulePricesStorage $rulePricesStorage
+      * @param \Magento\CatalogRule\Model\ResourceModel\RuleFactory $resourceRuleFactory
+      * @param StoreManagerInterface $storeManager
+      * @param TimezoneInterface $localeDate
+      * @param CustomerModelSession $customerSession
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      */
+     public function __construct(
+         RulePricesStorage $rulePricesStorage,
+         \Magento\CatalogRule\Model\ResourceModel\RuleFactory $resourceRuleFactory,
+         StoreManagerInterface $storeManager,
+         TimezoneInterface $localeDate,
+-        CustomerModelSession $customerSession
++        CustomerModelSession $customerSession,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         $this->rulePricesStorage = $rulePricesStorage;
+         $this->resourceRuleFactory = $resourceRuleFactory;
+         $this->storeManager = $storeManager;
+         $this->localeDate = $localeDate;
+         $this->customerSession = $customerSession;
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -80,7 +91,7 @@ class ProcessFrontFinalPriceObserver implements ObserverInterface
+         if ($observer->hasDate()) {
+             $date = new \DateTime($observer->getEvent()->getDate());
+         } else {
+-            $date = $this->localeDate->scopeDate($storeId);
++            $date = $this->ruleDateFormatter->getDate($storeId);
+         }
+ 
+         if ($observer->hasWebsiteId()) {
+diff --git a/vendor/magento/module-catalog-rule/Pricing/Price/CatalogRulePrice.php b/vendor/magento/module-catalog-rule/Pricing/Price/CatalogRulePrice.php
+index e4efd044dc1..8ce2ea334a2 100644
+--- a/vendor/magento/module-catalog-rule/Pricing/Price/CatalogRulePrice.php
++++ b/vendor/magento/module-catalog-rule/Pricing/Price/CatalogRulePrice.php
+@@ -9,6 +9,7 @@ namespace Magento\CatalogRule\Pricing\Price;
+ use Magento\Catalog\Model\Product;
+ use Magento\CatalogRule\Model\ResourceModel\Rule;
+ use Magento\CatalogRule\Model\ResourceModel\RuleFactory;
++use Magento\CatalogRule\Model\RuleDateFormatterInterface as RuleDateFormatterInterface;
+ use Magento\Customer\Model\Session;
+ use Magento\Framework\App\ObjectManager;
+ use Magento\Framework\Pricing\Adjustment\Calculator;
+@@ -43,8 +44,8 @@ class CatalogRulePrice extends AbstractPrice implements BasePriceProviderInterfa
+     protected $customerSession;
+ 
+     /**
+-     * @var \Magento\CatalogRule\Model\ResourceModel\RuleFactory
+-     * @deprecated 100.0.2
++     * @var RuleFactory
++     * @deprecated 100.1.1
+      */
+     protected $resourceRuleFactory;
+ 
+@@ -54,10 +55,16 @@ class CatalogRulePrice extends AbstractPrice implements BasePriceProviderInterfa
+     private $ruleResource;
+ 
+     /**
++     * @var RuleDateFormatterInterface
++     */
++    private $ruleDateFormatter;
++
++    /**
+      * @param Product $saleableItem
+      * @param float $quantity
+      * @param Calculator $calculator
+      * @param RuleFactory $catalogRuleResourceFactory
++     * @param RuleDateFormatterInterface|null $ruleDateFormatter
+      * @param TimezoneInterface $dateTime
+      * @param StoreManager $storeManager
+      * @param Session $customerSession
+@@ -71,13 +78,16 @@ class CatalogRulePrice extends AbstractPrice implements BasePriceProviderInterfa
+         TimezoneInterface $dateTime,
+         StoreManager $storeManager,
+         Session $customerSession,
+-        RuleFactory $catalogRuleResourceFactory
++        RuleFactory $catalogRuleResourceFactory,
++        RuleDateFormatterInterface $ruleDateFormatter = null
+     ) {
+         parent::__construct($saleableItem, $quantity, $calculator, $priceCurrency);
+         $this->dateTime = $dateTime;
+         $this->storeManager = $storeManager;
+         $this->customerSession = $customerSession;
+         $this->resourceRuleFactory = $catalogRuleResourceFactory;
++        $this->ruleDateFormatter = $ruleDateFormatter ?: ObjectManager::getInstance()
++            ->get(RuleDateFormatterInterface::class);
+     }
+ 
+     /**
+@@ -93,7 +103,7 @@ class CatalogRulePrice extends AbstractPrice implements BasePriceProviderInterfa
+             } else {
+                 $this->value = $this->getRuleResource()
+                     ->getRulePrice(
+-                        $this->dateTime->scopeDate($this->storeManager->getStore()->getId()),
++                        $this->ruleDateFormatter->getDate($this->storeManager->getStore()->getId()),
+                         $this->storeManager->getStore()->getWebsiteId(),
+                         $this->customerSession->getCustomerGroupId(),
+                         $this->product->getId()
+diff --git a/vendor/magento/module-catalog-rule/etc/di.xml b/vendor/magento/module-catalog-rule/etc/di.xml
+index e0d91db5423..c9e0fa46fc6 100644
+--- a/vendor/magento/module-catalog-rule/etc/di.xml
++++ b/vendor/magento/module-catalog-rule/etc/di.xml
+@@ -164,4 +164,5 @@
+             <argument name="customConditionProvider" xsi:type="object">CatalogRuleCustomConditionProvider</argument>
+         </arguments>
+     </type>
++    <preference for="Magento\CatalogRule\Model\RuleDateFormatterInterface" type="Magento\CatalogRule\Model\RuleDateFormatter" />
+ </config>
+diff --git a/vendor/magento/module-catalog-rule/view/adminhtml/ui_component/catalog_rule_form.xml b/vendor/magento/module-catalog-rule/view/adminhtml/ui_component/catalog_rule_form.xml
+index fb34a3ac4bb..cd747304903 100644
+--- a/vendor/magento/module-catalog-rule/view/adminhtml/ui_component/catalog_rule_form.xml
++++ b/vendor/magento/module-catalog-rule/view/adminhtml/ui_component/catalog_rule_form.xml
+@@ -95,33 +95,30 @@
+                 <dataScope>description</dataScope>
+             </settings>
+         </field>
+-        <field name="is_active" formElement="select">
++        <field name="is_active" formElement="checkbox">
+             <argument name="data" xsi:type="array">
+                 <item name="config" xsi:type="array">
+                     <item name="source" xsi:type="string">catalog_rule</item>
++                    <item name="default" xsi:type="number">0</item>
+                 </item>
+             </argument>
+             <settings>
+-                <dataType>number</dataType>
+-                <label translate="true">Status</label>
+-                <visible>true</visible>
+-                <dataScope>is_active</dataScope>
++                <validation>
++                    <rule name="required-entry" xsi:type="boolean">true</rule>
++                </validation>
++                <dataType>boolean</dataType>
++                <label translate="true">Active</label>
+             </settings>
+             <formElements>
+-                <select>
++                <checkbox>
+                     <settings>
+-                        <options>
+-                            <option name="0" xsi:type="array">
+-                                <item name="value" xsi:type="number">1</item>
+-                                <item name="label" xsi:type="string" translate="true">Active</item>
+-                            </option>
+-                            <option name="1" xsi:type="array">
+-                                <item name="value" xsi:type="number">0</item>
+-                                <item name="label" xsi:type="string" translate="true">Inactive</item>
+-                            </option>
+-                        </options>
++                        <valueMap>
++                            <map name="false" xsi:type="number">0</map>
++                            <map name="true" xsi:type="number">1</map>
++                        </valueMap>
++                        <prefer>toggle</prefer>
+                     </settings>
+-                </select>
++                </checkbox>
+             </formElements>
+         </field>
+         <field name="website_ids" formElement="multiselect">
+diff --git a/vendor/magento/module-catalog-rule-staging/Model/UtcRuleDateFormatter.php b/vendor/magento/module-catalog-rule-staging/Model/UtcRuleDateFormatter.php
+new file mode 100644
+index 00000000000..d0669856dbc
+--- /dev/null
++++ b/vendor/magento/module-catalog-rule-staging/Model/UtcRuleDateFormatter.php
+@@ -0,0 +1,64 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++declare(strict_types=1);
++
++namespace Magento\CatalogRuleStaging\Model;
++
++/**
++ * Uts date for catalog rule
++ */
++class UtcRuleDateFormatter implements \Magento\CatalogRule\Model\RuleDateFormatterInterface
++{
++    /**
++     * @var \Magento\CatalogRule\Model\RuleDateFormatter
++     */
++    private $ruleDateFormatter;
++
++    /**
++     * @var \Magento\Framework\Stdlib\DateTime\DateTime
++     */
++    private $dateTime;
++
++    /**
++     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
++     */
++    private $localeDate;
++
++    /**
++     * @param \Magento\CatalogRule\Model\RuleDateFormatter $ruleDateFormatter
++     * @param \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
++     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
++     */
++    public function __construct(
++        \Magento\CatalogRule\Model\RuleDateFormatter $ruleDateFormatter,
++        \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
++        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
++    ) {
++        $this->ruleDateFormatter = $ruleDateFormatter;
++        $this->dateTime = $dateTime;
++        $this->localeDate = $localeDate;
++    }
++
++    /**
++     * @inheritdoc
++     */
++    public function getDate($scope = null): \DateTime
++    {
++        $date = $this->ruleDateFormatter->getDate($scope);
++        $date->setTimezone(new \DateTimeZone($this->localeDate->getDefaultTimezone()));
++
++        return $date;
++    }
++
++    /**
++     * @inheritdoc
++     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
++     */
++    public function getTimeStamp($scope = null): int
++    {
++        return $this->dateTime->gmtTimestamp();
++    }
++}
+\ No newline at end of file
+diff --git a/vendor/magento/module-catalog-rule-staging/Model/Operation/Create.php b/vendor/magento/module-catalog-rule-staging/Model/Operation/Create.php
+index 5c9dea39308..2c14b156644 100644
+--- a/vendor/magento/module-catalog-rule-staging/Model/Operation/Create.php
++++ b/vendor/magento/module-catalog-rule-staging/Model/Operation/Create.php
+@@ -13,6 +13,10 @@ use Magento\Staging\Model\Operation\Update;
+ use Magento\Staging\Model\Operation\Create as StagingCreateOperation;
+ 
+ /**
++ * Class Create
++ *
++ * Saves Catalog Price Rule with staging information.
++ *
+  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+  */
+ class Create implements CreateInterface
+@@ -64,6 +68,8 @@ class Create implements CreateInterface
+     }
+ 
+     /**
++     * Create entity.
++     *
+      * @param \Magento\CatalogRule\Api\Data\RuleInterface $entity
+      * @param array $arguments
+      * @return object
+@@ -71,46 +77,6 @@ class Create implements CreateInterface
+      */
+     public function execute($entity, $arguments = [])
+     {
+-        // Create update from now to max_int
+-        $updateVersionId = $this->getUpdateVersion($entity);
+-        $entity = $this->operationCreate->execute($entity, $arguments);
+-        // Create staging update for default entity
+-        $currentVersionId = $this->versionManager->getCurrentVersion()->getId();
+-        $this->versionManager->setCurrentVersionId($updateVersionId);
+-        $this->operationUpdate->execute($entity, array_merge($arguments, ['created_in' => $updateVersionId]));
+-        $this->versionManager->setCurrentVersionId($currentVersionId);
+-        return $entity;
+-    }
+-
+-    /**
+-     * Get appropriate update version for the update.
+-     * @param \Magento\CatalogRule\Api\Data\RuleInterface $entity
+-     * @return int
+-     */
+-    private function getUpdateVersion($entity)
+-    {
+-        $updateId = $this->createUpdate($entity);
+-        $currentVersion = $this->versionManager->getVersion()->getId();
+-        if ($updateId == $currentVersion) {
+-            return $this->updateRepository->get($updateId)->getId();
+-        }
+-        return $updateId;
+-    }
+-
+-    /**
+-     * Create update for entity dates.
+-     * @param \Magento\CatalogRule\Api\Data\RuleInterface $entity
+-     * @return int
+-     */
+-    private function createUpdate($entity)
+-    {
+-        /** @var \Magento\Staging\Api\Data\UpdateInterface $update */
+-        $update = $this->updateFactory->create();
+-        $update->setName($entity->getName());
+-        $update->setIsCampaign(false);
+-        $date = new \DateTime('now', new \DateTimeZone('UTC'));
+-        $update->setStartTime($date->format('Y-m-d H:i:s'));
+-        $this->updateRepository->save($update);
+-        return $update->getId();
++        return $this->operationCreate->execute($entity, $arguments);
+     }
+ }
+diff --git a/vendor/magento/module-catalog-rule-staging/etc/di.xml b/vendor/magento/module-catalog-rule-staging/etc/di.xml
+index 29419a099c3..1dfc093f5c6 100644
+--- a/vendor/magento/module-catalog-rule-staging/etc/di.xml
++++ b/vendor/magento/module-catalog-rule-staging/etc/di.xml
+@@ -175,4 +175,5 @@
+             </argument>
+         </arguments>
+     </type>
++    <preference for="Magento\CatalogRule\Model\RuleDateFormatterInterface" type="Magento\CatalogRuleStaging\Model\UtcRuleDateFormatter" />
+ </config>
+diff --git a/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalog_rule_form.xml b/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalog_rule_form.xml
+index 5bf46082c65..d0aec632411 100644
+--- a/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalog_rule_form.xml
++++ b/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalog_rule_form.xml
+@@ -12,16 +12,6 @@
+         </buttons>
+     </settings>
+     <fieldset name="rule_information">
+-        <field name="is_active">
+-            <argument name="data" xsi:type="array">
+-                <item name="config" xsi:type="array">
+-                    <item name="value" xsi:type="string">0</item>
+-                </item>
+-            </argument>
+-            <settings>
+-                <visible>false</visible>
+-            </settings>
+-        </field>
+         <field name="from_date">
+             <settings>
+                 <visible>false</visible>
+diff --git a/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalogrulestaging_update_form.xml b/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalogrulestaging_update_form.xml
+index 2c1c79cf1a9..1872b92b6ce 100644
+--- a/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalogrulestaging_update_form.xml
++++ b/vendor/magento/module-catalog-rule-staging/view/adminhtml/ui_component/catalogrulestaging_update_form.xml
+@@ -331,33 +331,30 @@
+                 <dataScope>description</dataScope>
+             </settings>
+         </field>
+-        <field name="is_active" formElement="select">
++        <field name="is_active" formElement="checkbox">
+             <argument name="data" xsi:type="array">
+                 <item name="config" xsi:type="array">
+                     <item name="source" xsi:type="string">catalog_rule</item>
++                    <item name="default" xsi:type="number">0</item>
+                 </item>
+             </argument>
+             <settings>
+-                <dataType>number</dataType>
+-                <label translate="true">Status</label>
+-                <visible>true</visible>
+-                <dataScope>is_active</dataScope>
++                <validation>
++                    <rule name="required-entry" xsi:type="boolean">true</rule>
++                </validation>
++                <dataType>boolean</dataType>
++                <label translate="true">Active</label>
+             </settings>
+             <formElements>
+-                <select>
++                <checkbox>
+                     <settings>
+-                        <options>
+-                            <option name="0" xsi:type="array">
+-                                <item name="value" xsi:type="number">1</item>
+-                                <item name="label" xsi:type="string" translate="true">Active</item>
+-                            </option>
+-                            <option name="1" xsi:type="array">
+-                                <item name="value" xsi:type="number">0</item>
+-                                <item name="label" xsi:type="string" translate="true">Inactive</item>
+-                            </option>
+-                        </options>
++                        <valueMap>
++                            <map name="false" xsi:type="number">0</map>
++                            <map name="true" xsi:type="number">1</map>
++                        </valueMap>
++                        <prefer>toggle</prefer>
+                     </settings>
+-                </select>
++                </checkbox>
+             </formElements>
+         </field>
+         <field name="website_ids" formElement="multiselect">

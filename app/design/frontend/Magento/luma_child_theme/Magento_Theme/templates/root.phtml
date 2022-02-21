@@ -1,0 +1,22 @@
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+// @codingStandardsIgnoreFile
+
+?>
+<!doctype html>
+<html <?= /* @escapeNotVerified */ $htmlAttributes ?>>
+    <head <?= /* @escapeNotVerified */ $headAttributes ?>>
+        <?= /* @escapeNotVerified */ $requireJs ?>
+        <?= /* @escapeNotVerified */ $headContent ?>
+        <?= /* @escapeNotVerified */ $headAdditional ?>
+        <script src="//cdn.searchspring.net/search/v3/js/searchspring.catalog.js?70bbfe"></script>
+
+    </head>
+    <body data-container="body" data-mage-init='{"loaderAjax": {}, "loader": { "icon": "<?= /* @escapeNotVerified */ $loaderIcon ?>"}}' <?= /* @escapeNotVerified */ $bodyAttributes ?>>
+        <?= /* @escapeNotVerified */ $layoutContent ?>
+    </body>
+</html>

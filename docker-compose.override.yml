@@ -1,0 +1,35 @@
+version: '2'
+services:
+  db:
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=curricanes
+      - MYSQL_USER=curricanes
+      - MYSQL_PASSWORD=curricanes
+    volumes:
+      - db_data:/var/lib/mysql
+  redis:
+    ports:
+      - 6379:6379
+  elasticsearch:
+    ports:
+      - 9200:9200
+  fpm:
+    volumes:
+      - '.:/app:delegated'
+  build:
+    volumes:
+      - '.:/app:delegated'
+  deploy:
+    volumes:
+      - '.:/app:delegated'
+  web:
+    volumes:
+      - '.:/app:delegated'
+  varnish:
+    environment:
+      - VIRTUAL_HOST=curricanes.test
+volumes:
+  db_data:

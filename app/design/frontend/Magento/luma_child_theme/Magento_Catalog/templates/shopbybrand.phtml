@@ -1,0 +1,41 @@
+<?php
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+// $catId = 277; //Parent Category ID
+// $subCategory = $objectManager->create('Magento\Catalog\Model\Category')->load($catId);
+// $subcats = $subCategory->getChildrenCategories();
+
+ $categoryFactory = $objectManager->get('\Magento\Catalog\Model\CategoryFactory');// Instance of Category Model
+ $categoryId = 277; // YOUR CATEGORY ID
+ $category = $categoryFactory->create()->load($categoryId);
+
+
+ // Children  Categories
+ $subcats = $category->getChildrenCategories();
+
+
+
+// $category = $objectManager->get('Magento\Framework\Registry')->registry('current_category');//get current category
+// $subcats = $category->getChildrenCategories();
+?>
+
+<div class="subcat-directory">
+<ul class="brand-list">
+        <?php foreach ($subcats as $_category){ ?>
+       <?php  if ($_category->getIsActive()) {
+            $_category = $objectManager->create('Magento\Catalog\Model\Category')->load($_category->getId()); ?>
+            <?php $_name = $_category->getName()?>
+            
+            <li class="brand-item">
+            <div class="inner">
+                <a href="<?php echo $_category->getUrl() ?>" title="<?php echo $_name ?>" class="brand-logo">
+                <img src="<?php echo $_category->getImageUrl() ?>" alt="<?php echo $_name ?>" />
+                </a>
+            </div>
+            </li>
+            
+        <?php 
+       }
+        }
+        ?>     
+        </ul>  
+</div>

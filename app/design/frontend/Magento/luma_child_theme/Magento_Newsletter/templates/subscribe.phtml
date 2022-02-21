@@ -1,0 +1,52 @@
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+// @codingStandardsIgnoreFile
+
+/** @var \Magento\Newsletter\Block\Subscribe $block */
+
+?>
+<div class="block newsletter">
+<div class="container">
+        <div class="row">
+    <div class="title">
+                <strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Suscríbete a nuestro Boletín de Noticias.</font></font></strong>
+                <span class="slog-newsletter"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Y entérate de la llegada de productos nuevos así como nuestras promociones</font></font></span>
+            </div>
+    <div class="content">
+        <form class="form subscribe"
+            novalidate
+            action="<?= $block->escapeUrl($block->getFormActionUrl()) ?>"
+            method="post"
+            data-mage-init='{"validation": {"errorClass": "mage-error"}}'
+            id="newsletter-validate-detail">
+            <div class="field newsletter">
+                <div class="control">
+                    <label for="newsletter">
+                        <span class="label">
+                            <?= $block->escapeHtml(__('Sign Up for Our Newsletter:')) ?>
+                        </span>
+                        <input name="email" type="email" id="newsletter"
+                               placeholder="<?= $block->escapeHtml(__('Enter your email address')) ?>"
+                               data-mage-init='{"mage/trim-input":{}}'
+                               data-validate="{required:true, 'validate-email':true}"
+                        />
+                    </label>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="action subscribe primary sr-only"
+                        title="<?= $block->escapeHtmlAttr(__('Suscríbete')) ?>"
+                        type="submit"
+                        aria-label="Subscribe">
+                    <span><?= $block->escapeHtml(__('Suscríbete')) ?></span>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+</div>

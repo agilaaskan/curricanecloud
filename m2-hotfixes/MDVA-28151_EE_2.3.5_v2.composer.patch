@@ -1,0 +1,30 @@
+diff --git a/vendor/magento/module-catalog/etc/db_schema.xml b/vendor/magento/module-catalog/etc/db_schema.xml
+index d5b318f6717..91c0fb04edb 100644
+--- a/vendor/magento/module-catalog/etc/db_schema.xml
++++ b/vendor/magento/module-catalog/etc/db_schema.xml
+@@ -138,6 +138,11 @@
+         <index referenceId="CATALOG_PRODUCT_ENTITY_INT_STORE_ID" indexType="btree">
+             <column name="store_id"/>
+         </index>
++        <index referenceId="CATALOG_PRODUCT_ENTITY_INT_ATTRIBUTE_ID_STORE_ID_VALUE" indexType="btree">
++            <column name="attribute_id"/>
++            <column name="store_id"/>
++            <column name="value"/>
++        </index>
+     </table>
+     <table name="catalog_product_entity_text" resource="default" engine="innodb"
+            comment="Catalog Product Text Attribute Backend Table">
+diff --git a/vendor/magento/module-catalog/etc/db_schema_whitelist.json b/vendor/magento/module-catalog/etc/db_schema_whitelist.json
+index d4bd6927d43..f4cda73c371 100644
+--- a/vendor/magento/module-catalog/etc/db_schema_whitelist.json
++++ b/vendor/magento/module-catalog/etc/db_schema_whitelist.json
+@@ -69,7 +69,8 @@
+         },
+         "index": {
+             "CATALOG_PRODUCT_ENTITY_INT_ATTRIBUTE_ID": true,
+-            "CATALOG_PRODUCT_ENTITY_INT_STORE_ID": true
++            "CATALOG_PRODUCT_ENTITY_INT_STORE_ID": true,
++            "CATALOG_PRODUCT_ENTITY_INT_ATTRIBUTE_ID_STORE_ID_VALUE": true
+         },
+         "constraint": {
+             "PRIMARY": true,

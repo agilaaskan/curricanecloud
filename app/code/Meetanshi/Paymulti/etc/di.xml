@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
+	<preference for="Magento\Paypal\Model\Express\Checkout" type="Meetanshi\Paymulti\Model\Express\Checkout"/>
+	<preference for="Magento\Paypal\Model\Api\Nvp" type="Meetanshi\Paymulti\Model\Api\Nvp"/>
+	<preference for="Magento\Paypal\Model\Express" type="Meetanshi\Paymulti\Model\Express"/>
+	<preference for="Magento\Paypal\Model\Config" type="Meetanshi\Paymulti\Model\Paypal\Config" />
+</config>
